@@ -12,7 +12,7 @@ purpleColour="\e[0;35m\033[1m"
 turquoiseColour="\e[0;36m\033[1m"
 grayColour="\e[0;37m\033[1m"
 
-clear
+#clear
 
 #ADD ASCII INTRO
 
@@ -22,6 +22,7 @@ trap ctrl_c INT
 function ctrl_c(){
     echo -e "\n${redColour}[!] Exiting...\n${endColour}"
 
+    rm ut.t* 2>/dev/null
     #Volver a obtener el cursor
     tput cnorm; exit 1 
 }
@@ -45,7 +46,7 @@ function helpPanel(){
 
 #Variables globales
 
-unconfirmed_transations="https://www.blockchain.com/btc/unconfirmed-transactions"
+unconfirmed_transactions="https://www.blockchain.com/btc/unconfirmed-transactions"
 inspect_transaction="https://www.blockchain.com/btc/tx"
 inspect_address_url="https://www.blockchain.com/btc/address"
 
@@ -139,17 +140,25 @@ function trimString(){
 
 function unconfirmedTransactions(){
 
-    echo '' > ut.tmp
+    touch ut.tmp
 
-    while [ "$(cat ut.tmp | wc -l" == "1)" ];do
+    while [ "$(cat ut.tmp | wc -l)" == "0" ]; do
         curl -s "$unconfirmed_transactions" | html2text > ut.tmp
     done
     
     hashes=$(cat ut.tmp | grep "Hash" -A 1 | grep -v -E "Hash|\--|Time") #HASHES STORED IN VARIABLES TO ITERATE
 
-    for hash in hashes;do
-        echo
-    done
+    echo "Hash_USD_Bitcoin_Time" > ut.table
+
+    for hash in $hashes; do
+		echo "${hash}_$(cat ut.tmp | grep "$hash" -A 6 | tail -n 1)_$(cat ut.tmp | grep "$hash" -A 4 | tail -n 1)_$(cat ut.tmp | grep "$hash" -A 2 | tail -n 1)" >> ut.table
+	done
+
+    # echo "uttmp:"
+    # cat ut.tmp
+    # echo "ut table: "
+    cat ut.table
+    sleep 100
 
     tput cnorm #TAKE POINTER AWAY OR BACK IN
 }
