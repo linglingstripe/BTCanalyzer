@@ -22,7 +22,7 @@ trap ctrl_c INT
 function ctrl_c(){
     echo -e "\n${redColour}[!] Exiting...\n${endColour}"
 
-    rm ut.t* 2>/dev/null
+    rm ut.* money* amount* 2>/dev/null
     #Volver a obtener el cursor
     tput cnorm; exit 1 
 }
@@ -38,6 +38,7 @@ function helpPanel(){
     echo -e "\t\t${purpleColour}unconfirmed_transactions${endColour}${yellowColour}:\t List unconfirmed transactions${endColour}"
     echo -e "\t\t${purpleColour}inspect${endColour}${yellowColour}:\t\t\t Inspect a transaction hash${endColour}"
     echo -e "\t\t${purpleColour}address${endColour}${yellowColour}:\t\t\t Inspect a transaction address${endColour}"
+    echo -e "\n\t${grayColour}[-n]${endColour}${yellowColour} Limit the number of outputs${endColour}${blueColour} (Example: -n 10)${endColour}"
     echo -e "\n\t${grayColour}[-h]${endColour}${yellowColour} Show this help panel${endColour}\n"
 
     tput cnorm; exit 1
@@ -140,33 +141,59 @@ function trimString(){
 
 function unconfirmedTransactions(){
 
+    number_output=$1
+
     touch ut.tmp
 
     while [ "$(cat ut.tmp | wc -l)" == "0" ]; do
         curl -s "$unconfirmed_transactions" | html2text > ut.tmp
     done
     
-    hashes=$(cat ut.tmp | grep "Hash" -A 1 | grep -v -E "Hash|\--|Time") #HASHES STORED IN VARIABLES TO ITERATE
+    hashes=$(cat ut.tmp | grep "Hash" -A 1 | grep -v -E "Hash|\--|Time" | head -n $number_output) #HASHES STORED IN VARIABLES TO ITERATE
 
-    echo "Hash_USD_Bitcoin_Time" > ut.table
+    echo "Hash_USD_Amount_Time" > ut.table
 
     for hash in $hashes; do
 		echo "${hash}_$(cat ut.tmp | grep "$hash" -A 6 | tail -n 1)_$(cat ut.tmp | grep "$hash" -A 4 | tail -n 1)_$(cat ut.tmp | grep "$hash" -A 2 | tail -n 1)" >> ut.table
-	done
+	done; echo $
 
-    # echo "uttmp:"
-    # cat ut.tmp
-    # echo "ut table: "
-    cat ut.table
-    sleep 100
+    cat ut.table | tr '_' ' ' | awk '{print $2}' | grep -v "USD" | tr -d '$' | sed 's/\..*//g' | tr -d ',' >> money.txt
+
+    money=0; cat money.txt | while read money_in_line; do
+        let money+=$money_in_line
+        echo $money > money.tmp
+    done;
+
+    echo -n "Total amount in the last $number_output transactions_" > amount.table
+    echo "\$$(printf "%'.d\n" $(cat money.tmp))" >> amount.table
+
+    if [ "$(cat ut.table | wc -l)" != "1" ]; then
+        echo -ne "${yellowColour}"
+        printTable '_' "$(cat ut.table)"
+        echo -ne "${endColour}"
+        echo -ne "${blueColour}"
+        printTable '_' "$(cat amount.table)"
+        echo -ne "${endColour}"
+        rm ut.* money* amount* 2>/dev/null
+        tput cnorm; exit 0
+    else
+        rm ut.* money* amount* 2>/dev/null
+    fi
+
+    echo -ne "${yellowColour}"
+    printTable '_' "$(cat ut.table)"
+    echo -ne "${endColour}"
+
+    rm ut.* money* amount* 2>/dev/null
 
     tput cnorm #TAKE POINTER AWAY OR BACK IN
 }
 
 parameter_counter=0
-while getopts "e:h:" arg; do
+while getopts "e:n:h:" arg; do
     case $arg in
         e) exploration_mode=$OPTARG; let parameter_counter+=1;;
+        n) number_output=$OPTARG; let parameter_counter+=1;;
         h) helpPanel;;
     esac
 done
@@ -177,6 +204,12 @@ if [ $parameter_counter -eq 0 ]; then
     helpPanel
 else
     if [ "$(echo $exploration_mode)" == "unconfirmed_transactions" ]; then
-    unconfirmedTransactions
+        if [ ! "$number_output" ]; then
+            number_output=100
+            unconfirmedTransactions $number_output
+        else
+            unconfirmedTransactions $number_output
+        fi
+        #unconfirmedTransactions
     fi
 fi
