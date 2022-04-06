@@ -39,6 +39,7 @@ function helpPanel(){
     echo -e "\t\t${purpleColour}inspect${endColour}${yellowColour}:\t\t\t Inspect a transaction hash${endColour}"
     echo -e "\t\t${purpleColour}address${endColour}${yellowColour}:\t\t\t Inspect a transaction address${endColour}"
     echo -e "\n\t${grayColour}[-n]${endColour}${yellowColour} Limit the number of outputs${endColour}${blueColour} (Example: -n 10)${endColour}"
+    echo -e "\n\t${grayColour}[-i]${endColour}${yellowColour} Set the transaction ID${endColour}${blueColour} (Example: -i ff8580f0022eacdb2278113369a2cd35174063632d4e6c7f5e1bfce456f2f8e4) ${endColour}"
     echo -e "\n\t${grayColour}[-h]${endColour}${yellowColour} Show this help panel${endColour}\n"
 
     tput cnorm; exit 1
@@ -48,7 +49,7 @@ function helpPanel(){
 #Variables globales
 
 unconfirmed_transactions="https://www.blockchain.com/btc/unconfirmed-transactions"
-inspect_transaction="https://www.blockchain.com/btc/tx"
+inspect_transaction_url="https://www.blockchain.com/btc/tx/"
 inspect_address_url="https://www.blockchain.com/btc/address"
 
 function printTable(){
@@ -189,11 +190,34 @@ function unconfirmedTransactions(){
     tput cnorm #TAKE POINTER AWAY OR BACK IN
 }
 
+function inspectTransaction(){
+    inspect_transaction_hash=$1
+
+    echo "Total Input_Total Output" > total_input_output.tmp
+
+    while [ "$(cat total_input_output.tmp | wc -l)" == "1" ];do
+        curl -s ${inspect_transaction_url}${inspect_transaction_hash} | html2text | grep -E "Total Input|Total Output" -A 1 | grep -v -E "Total Input|Total Output" | xargs | tr ' ' '_' | sed 's/_BTC/ BTC/g' >> total_input_output.tmp
+    done
+    echo -ne "${grayColour}"
+    printTable '_' "$(cat total_input_output.tmp)"
+    echo -ne "${endColour}"
+    
+    echo "Adress (Inputs)_Value" > inputs.tmp
+    while [ "$(cat inputs.tmp | wc -l)" == "1" ];do
+        curl -s ${inspect_transaction_url}${inspect_transaction_hash} | html2text | grep "Inputs" -A 500 | grep "Outputs" -B 500 | grep "Address" -A 3 | grep -v -E "Address|Value|\--" | awk 'NR%2{printf "%s ",$0;next;}1' | awk '{print $1 "_" $2 " " $3}' >> inputs.tmp 
+    done
+    echo -ne "${greenColour}"
+        printTable '_' "$(cat inputs.tmp)"
+    echo -ne "${endColour}"
+    rm *.tmp 2>/dev/null
+}
+
 parameter_counter=0
-while getopts "e:n:h:" arg; do
+while getopts "e:n:i:h:" arg; do
     case $arg in
         e) exploration_mode=$OPTARG; let parameter_counter+=1;;
         n) number_output=$OPTARG; let parameter_counter+=1;;
+        i) inspect_transaction=$OPTARG; let parameter_counter+=1;;
         h) helpPanel;;
     esac
 done
@@ -210,6 +234,7 @@ else
         else
             unconfirmedTransactions $number_output
         fi
-        #unconfirmedTransactions
+    elif [ "$(echo $exploration_mode)" == "inspect" ]; then
+        inspectTransaction $inspect_transaction
     fi
 fi
