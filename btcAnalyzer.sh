@@ -39,7 +39,8 @@ function helpPanel(){
     echo -e "\t\t${purpleColour}inspect${endColour}${yellowColour}:\t\t\t Inspect a transaction hash${endColour}"
     echo -e "\t\t${purpleColour}address${endColour}${yellowColour}:\t\t\t Inspect a transaction address${endColour}"
     echo -e "\n\t${grayColour}[-n]${endColour}${yellowColour} Limit the number of outputs${endColour}${blueColour} (Example: -n 10)${endColour}"
-    echo -e "\n\t${grayColour}[-i]${endColour}${yellowColour} Set the transaction ID${endColour}${blueColour} (Example: -i ff8580f0022eacdb2278113369a2cd35174063632d4e6c7f5e1bfce456f2f8e4) ${endColour}"
+    echo -e "\n\t${grayColour}[-i]${endColour}${yellowColour} Set the transaction ID${endColour}${blueColour} (Example: -i ff8580f0022eacdb2278113369a2cd35174063632d4e6c7f5e1bfce456f2f8e4)${endColour}"
+    echo -e "\n\t${grayColour}[-a]${endColour}${yellowColour} Look up an address${endColour}${blueColour} (Example: -a 3GYjW5ugRpjPqWQsCt4f4BRxT3Tv3uoJ5b)${endColour}"
     echo -e "\n\t${grayColour}[-h]${endColour}${yellowColour} Show this help panel${endColour}\n"
 
     tput cnorm; exit 1
@@ -50,7 +51,7 @@ function helpPanel(){
 
 unconfirmed_transactions="https://www.blockchain.com/btc/unconfirmed-transactions"
 inspect_transaction_url="https://www.blockchain.com/btc/tx/"
-inspect_address_url="https://www.blockchain.com/btc/address"
+inspect_address_url="https://www.blockchain.com/btc/address/"
 
 function printTable(){
 
@@ -202,22 +203,40 @@ function inspectTransaction(){
     printTable '_' "$(cat total_input_output.tmp)"
     echo -ne "${endColour}"
     
-    echo "Adress (Inputs)_Value" > inputs.tmp
+    echo "Address (Inputs)_Value" > inputs.tmp
     while [ "$(cat inputs.tmp | wc -l)" == "1" ];do
         curl -s ${inspect_transaction_url}${inspect_transaction_hash} | html2text | grep "Inputs" -A 500 | grep "Outputs" -B 500 | grep "Address" -A 3 | grep -v -E "Address|Value|\--" | awk 'NR%2{printf "%s ",$0;next;}1' | awk '{print $1 "_" $2 " " $3}' >> inputs.tmp 
     done
     echo -ne "${greenColour}"
         printTable '_' "$(cat inputs.tmp)"
     echo -ne "${endColour}"
+
+    echo "Address (Outputs)_Value" > outputs.tmp
+    while [ "$(cat outputs.tmp | wc -l)" == "1" ];do
+        curl -s ${inspect_transaction_url}${inspect_transaction_hash} | html2text | grep "Outputs" -A 500 | grep "thought about it, now" -B 500 | grep "Address" -A 3 | grep -v -E "Address|Value|\--" | awk 'NR%2{printf "%s ",$0;next;}1' | awk '{print $1 "_" $2 " " $3}' >> outputs.tmp 
+    done
+    echo -ne "${greenColour}"
+        printTable '_' "$(cat outputs.tmp)"
+    echo -ne "${endColour}"
+
     rm *.tmp 2>/dev/null
+    tput cnorm
+}
+
+function inspectAddress(){
+    address_hash=$1
+    echo "Transactions_Total received (BTC)_Total sent (BTC)" > addressinfo.tmp
+    curl -s ${inspect_address_url}${address_hash} | html2text | grep -E "Transactions|Total Received|Total Sent|Final Balance" -A 1 | grep -v -E "Explorer|\[pri|--|Fee" | grep -v -E "Transactions|Total Received|Total Sent|Final Balance" | xargs | tr ' ' '_' | sed "s/_BTC/ BTC/g" >> addressinfo.tmp
+    1:53
 }
 
 parameter_counter=0
-while getopts "e:n:i:h:" arg; do
+while getopts "e:n:i:a:h:" arg; do
     case $arg in
         e) exploration_mode=$OPTARG; let parameter_counter+=1;;
         n) number_output=$OPTARG; let parameter_counter+=1;;
         i) inspect_transaction=$OPTARG; let parameter_counter+=1;;
+        a) inspect_address=$OPTARG; let parameter_counter+=1;;
         h) helpPanel;;
     esac
 done
@@ -236,5 +255,7 @@ else
         fi
     elif [ "$(echo $exploration_mode)" == "inspect" ]; then
         inspectTransaction $inspect_transaction
+    elif [ "$(echo $exploration_mode)" == "address" ]; then
+        inspectAddress $inspect_address
     fi
 fi
