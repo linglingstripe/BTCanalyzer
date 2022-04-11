@@ -225,9 +225,35 @@ function inspectTransaction(){
 
 function inspectAddress(){
     address_hash=$1
-    echo "Transactions_Total received (BTC)_Total sent (BTC)" > addressinfo.tmp
+    echo "Transactions_Total received (BTC)_Total sent (BTC)_Final Balance (BTC)" > addressinfo.tmp
     curl -s ${inspect_address_url}${address_hash} | html2text | grep -E "Transactions|Total Received|Total Sent|Final Balance" -A 1 | grep -v -E "Explorer|\[pri|--|Fee" | grep -v -E "Transactions|Total Received|Total Sent|Final Balance" | xargs | tr ' ' '_' | sed "s/_BTC/ BTC/g" >> addressinfo.tmp
-    1:53
+    
+    echo -ne "${grayColour}"
+    printTable '_' "$(cat addressinfo.tmp)"
+    echo -ne "${endColour}"
+    
+    btcvalue=$(curl -s https://cointelegraph.com/bitcoin-price | html2text | grep -E "Last Price" | awk "NR==1" | awk 'NF{print $NF}' | tr -d ',|$')
+
+    #curl -s ${inspect_address_url}${address_hash} | html2text | grep "Transactions" -A 1 | grep -v -E "Explorer|\[pri|--|Fee" 
+
+    #echo "--"
+
+    curl -s ${inspect_address_url}${address_hash} | html2text | grep -E "Transactions" -A 1 | grep -v -E "Explorer|\[pri|--|Fee" | grep -v -E "Transactions" > addressinfo.tmp
+    curl -s ${inspect_address_url}${address_hash} | html2text | grep -E "Total Received|Total Sent|Final Balance" -A 1 | grep -v -E "Explorer|\[pri|--|Fee" | grep -v -E "Total Received|Total Sent|Final Balance" > btc_to_dollar.tmp #| xargs | tr ' ' '_' | sed "s/_BTC/ BTC/g" >> addressinfo.tmp
+    
+    cat btc_to_dollar.tmp | while read value;do
+        echo "\$$(printf "%'.d\n" $(echo "$(echo $value | awk '{print $1}')*$btcvalue" | bc) 2>/dev/null)" >> addressinfo.tmp
+    done
+
+    line_null=$(cat addressinfo.tmp | grep -n "^\$$" | awk '{print $1}' FS=":")
+    echo $line_null
+
+    cat addressinfo.tmp
+
+    tput cnorm
+    rm *.tmp 2>/dev/null
+    sleep 100
+    2:10
 }
 
 parameter_counter=0
